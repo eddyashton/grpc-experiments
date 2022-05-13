@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x63\x63\x66\x61ke.proto\x12\x06\x63\x63\x66\x61ke\"(\n\nGetRequest\x12\r\n\x05table\x18\x01 \x01(\t\x12\x0b\n\x03key\x18\x02 \x01(\x0c\"\x1c\n\x0bGetResponse\x12\r\n\x05value\x18\x01 \x01(\x0c\"7\n\nPutRequest\x12\r\n\x05table\x18\x01 \x01(\t\x12\x0b\n\x03key\x18\x02 \x01(\x0c\x12\r\n\x05value\x18\x03 \x01(\x0c\"\x1e\n\x0bPutResponse\x12\x0f\n\x07\x65xisted\x18\x01 \x01(\x08\x32h\n\x02KV\x12\x30\n\x03Get\x12\x12.ccfake.GetRequest\x1a\x13.ccfake.GetResponse\"\x00\x12\x30\n\x03Put\x12\x12.ccfake.PutRequest\x1a\x13.ccfake.PutResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x63\x63\x66\x61ke.proto\x12\x06\x63\x63\x66\x61ke\"(\n\nGetRequest\x12\r\n\x05table\x18\x01 \x01(\t\x12\x0b\n\x03key\x18\x02 \x01(\x0c\"+\n\x0bGetResponse\x12\x12\n\x05value\x18\x01 \x01(\x0cH\x00\x88\x01\x01\x42\x08\n\x06_value\"7\n\nPutRequest\x12\r\n\x05table\x18\x01 \x01(\t\x12\x0b\n\x03key\x18\x02 \x01(\x0c\x12\r\n\x05value\x18\x03 \x01(\x0c\"\x1e\n\x0bPutResponse\x12\x0f\n\x07\x65xisted\x18\x01 \x01(\x08\x32h\n\x02KV\x12\x30\n\x03Get\x12\x12.ccfake.GetRequest\x1a\x13.ccfake.GetResponse\"\x00\x12\x30\n\x03Put\x12\x12.ccfake.PutRequest\x1a\x13.ccfake.PutResponse\"\x00\x62\x06proto3')
 
 
 
@@ -57,11 +57,11 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _GETREQUEST._serialized_start=24
   _GETREQUEST._serialized_end=64
   _GETRESPONSE._serialized_start=66
-  _GETRESPONSE._serialized_end=94
-  _PUTREQUEST._serialized_start=96
-  _PUTREQUEST._serialized_end=151
-  _PUTRESPONSE._serialized_start=153
-  _PUTRESPONSE._serialized_end=183
-  _KV._serialized_start=185
-  _KV._serialized_end=289
+  _GETRESPONSE._serialized_end=109
+  _PUTREQUEST._serialized_start=111
+  _PUTREQUEST._serialized_end=166
+  _PUTRESPONSE._serialized_start=168
+  _PUTRESPONSE._serialized_end=198
+  _KV._serialized_start=200
+  _KV._serialized_end=304
 # @@protoc_insertion_point(module_scope)
