@@ -10,9 +10,11 @@ service Registry
 message RegisterRequest
 {
   bytes executor_ident = 1;
+  string dispatch_category = 2;
 }
 
 message RegisterResponse
 {
   bool accepted = 1;
+  string error = 2;
 }
