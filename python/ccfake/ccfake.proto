@@ -2,10 +2,13 @@ syntax = "proto3";
 
 package ccfake;
 
+// Approximation of CCF's KV interface
 service KV
 {
+  // Get a single key
   rpc Get (GetRequest) returns (GetResponse) {}
   
+  // Put a single key-value pair
   rpc Put (PutRequest) returns (PutResponse) {}
 }
 
