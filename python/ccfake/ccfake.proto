@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package ccfake;
+
+service KV
+{
+  rpc Get (GetRequest) returns (GetResponse) {}
+  
+  rpc Put (PutRequest) returns (PutResponse) {}
+}
+
+message GetRequest
+{
+  string table = 1;
+  bytes key = 2;
+}
+
+message GetResponse
+{
+  bytes value = 1;
+}
+
+message PutRequest
+{
+  string table = 1;
+  bytes key = 2;
+  bytes value = 3;
+}
+
+message PutResponse
+{
+  bool existed = 1;
+}
