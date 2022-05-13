@@ -5,7 +5,6 @@ package ccfake;
 // Approximation of CCF's KV interface
 service KV
 {
-  rpc RegisterNewBusinessLogic (RegisterRequest) returns (RegisterResponse) {}
 
   rpc Ready (ReadyRequest) returns (BeginTx) {}
 
@@ -16,16 +15,6 @@ service KV
   rpc Put (PutRequest) returns (PutResponse) {}
 
   rpc ApplyTx (ApplyRequest) returns (ApplyResponse) {}
-}
-
-message RegisterRequest
-{
-
-}
-
-message RegisterResponse
-{
-  
 }
 
 message ReadyRequest {}

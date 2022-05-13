@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package ccfake;
+
+service Registry
+{
+  rpc Register (RegisterRequest) returns (RegisterResponse) {}
+}
+
+message RegisterRequest
+{
+  bytes executor_ident = 1;
+}
+
+message RegisterResponse
+{
+  bool accepted = 1;
+}
