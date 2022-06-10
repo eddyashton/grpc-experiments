@@ -2,6 +2,7 @@ from collections import defaultdict
 from concurrent import futures
 from enum import Enum
 from threading import Thread
+from loguru import logger as LOG
 
 import argparse
 import grpc
@@ -12,7 +13,10 @@ import registry_pb2_grpc
 import kv_pb2
 import kv_pb2_grpc
 
-DEFAULT_DISPATCH_CATEGORIES = {"/foo", "/bar"}
+import crypto
+
+
+DEFAULT_DISPATCH_CATEGORIES = {"foo", "bar"}
 
 
 class ExecutorState(Enum):
@@ -88,19 +92,29 @@ def fetch_server_cert_config(server_ident, registry):
 
 
 def serve(categories):
+    LOG.info("Registering workers in the following categories:")
+    for cat in categories:
+        LOG.info(f"  {cat}")
+
+    # Listen for Registration protocol
     registration_server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
     registry = Registry(categories=categories)
     registry_pb2_grpc.add_RegistryServicer_to_server(registry, registration_server)
+    registration_server_address = "localhost:50051"
+    LOG.info(f"Listening for registrations on {registration_server_address}")
     # TODO: This should be mutually auth'd
-    registration_server.add_insecure_port("localhost:50051")
+    registration_server.add_insecure_port(registration_server_address)
 
-    with open("key.pem", "rb") as f:
-        private_key = f.read()
-    with open("cert.pem", "rb") as f:
-        certificate_chain = f.read()
+    # Generate a fresh key-pair. Write public cert to disk
+    key_priv_pem, _ = crypto.generate_rsa_keypair(2048)
+    cert_pem = crypto.generate_cert(key_priv_pem, cn="CN=localhost", ca=True)
+    server_cert_path = "server_cert.pem"
+    with open(server_cert_path, "wb") as f:
+        f.write(cert_pem)
+        LOG.info(f"Wrote server's cert to {server_cert_path}")
+    server_ident = ((key_priv_pem, cert_pem),)
 
-    server_ident = ((private_key, certificate_chain),)
-
+    # Listen for KV protocol
     kv_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     kv = KV()
     kv_pb2_grpc.add_KVServicer_to_server(kv, kv_server)
@@ -109,14 +123,19 @@ def serve(categories):
         fetch_server_cert_config(server_ident, registry),
         True,
     )
-    kv_server.add_secure_port("localhost:50052", dynamic_creds)
+    kv_server_address = "localhost:50051"
+    LOG.info(f"Listening for KV traffic on {registration_server_address}")
+    kv_server.add_secure_port(kv_server_address, dynamic_creds)
 
+    # Listen on both servers
     kv_thread = Thread(target=lambda: kv_server.start())
     kv_thread.start()
-
     registration_server.start()
-    registration_server.wait_for_termination()
 
+    LOG.info("Running...")
+
+    # Terminate
+    registration_server.wait_for_termination()
     kv_server.stop()
 
 
@@ -130,5 +149,4 @@ if __name__ == "__main__":
     else:
         categories = DEFAULT_DISPATCH_CATEGORIES
 
-    print(categories)
     serve(categories)
