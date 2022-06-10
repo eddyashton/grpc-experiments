@@ -50,13 +50,35 @@ class Registry(registry_pb2_grpc.RegistryServicer):
 
         return ret
 
+class Tx:
+    def __init__(self, kv):
+        self.writes = defaultdict(dict)
+        self.kv = kv
+
+    def get(self, table, key):
+        if table in self.writes:
+            t = self.writes[table]
+            if key in t:
+                return t[key]
+        return self.kv[table][key]
+
+    def put(self, table, key, value):
+        self.writes[table][key] = value
+
 
 class KV(kv_pb2_grpc.KVServicer):
     def __init__(self):
         self.kv = defaultdict(dict)
-        self.available_clients = []
+        self.txs = {}
+
+    def _get_caller(self, context):
+        k = context.auth_context()["x509_pem_cert"][0]
+        if k not in self.txs:
+            self.txs[k] = len(self.txs)
+        return self.txs[k]
 
     def Get(self, request, context):
+        print(f"Get called by {self._get_caller(context)}")
         ret = kv_pb2.GetResponse()
         table = self.kv[request.table]
         if request.key in table:
@@ -64,6 +86,7 @@ class KV(kv_pb2_grpc.KVServicer):
         return ret
 
     def Put(self, request, context):
+        print(f"Put called by {self._get_caller(context)}")
         table = self.kv[request.table]
         exists = request.key in table
         table[request.key] = request.value

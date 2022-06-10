@@ -5,7 +5,6 @@ package ccfake;
 // Approximation of CCF's KV interface
 service KV
 {
-
   rpc Ready (ReadyRequest) returns (BeginTx) {}
 
   // Get a single key
