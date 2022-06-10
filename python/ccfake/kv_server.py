@@ -3,6 +3,7 @@ from concurrent import futures
 from enum import Enum
 from threading import Thread
 
+import argparse
 import grpc
 
 import registry_pb2
@@ -26,8 +27,7 @@ class Executor:
 
 
 class Registry(registry_pb2_grpc.RegistryServicer):
-    def __init__(self, server, categories=DEFAULT_DISPATCH_CATEGORIES):
-        self.server = server
+    def __init__(self, categories):
         self.executors = {category: {} for category in categories}
 
     def Register(self, request, context):
@@ -87,9 +87,9 @@ def fetch_server_cert_config(server_ident, registry):
     return fn
 
 
-def serve():
+def serve(categories):
     registration_server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
-    registry = Registry(registration_server)
+    registry = Registry(categories=categories)
     registry_pb2_grpc.add_RegistryServicer_to_server(registry, registration_server)
     # TODO: This should be mutually auth'd
     registration_server.add_insecure_port("localhost:50051")
@@ -121,4 +121,14 @@ def serve():
 
 
 if __name__ == "__main__":
-    serve()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--categories", nargs="*", type=str)
+    args = parser.parse_args()
+
+    if args.categories:
+        categories = args.categories
+    else:
+        categories = DEFAULT_DISPATCH_CATEGORIES
+
+    print(categories)
+    serve(categories)
