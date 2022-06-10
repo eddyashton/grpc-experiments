@@ -87,7 +87,7 @@ def serve():
     registry = Registry(registration_server)
     registry_pb2_grpc.add_RegistryServicer_to_server(registry, registration_server)
     # TODO: This should be mutually auth'd
-    registration_server.add_insecure_port("[::]:50051")
+    registration_server.add_insecure_port("localhost:50051")
 
     with open("key.pem", "rb") as f:
         private_key = f.read()
@@ -104,7 +104,7 @@ def serve():
         fetch_server_cert_config(server_ident, registry),
         True,
     )
-    kv_server.add_secure_port("[::]:50052", dynamic_creds)
+    kv_server.add_secure_port("localhost:50052", dynamic_creds)
 
     kv_thread = Thread(target=lambda: kv_server.start())
     kv_thread.start()

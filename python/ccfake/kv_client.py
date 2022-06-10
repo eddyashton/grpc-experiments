@@ -6,7 +6,7 @@ import kv_pb2_grpc
 
 
 def run():
-    with grpc.insecure_channel("localhost:50051") as channel:
+    with grpc.insecure_channel("localhost:50052") as channel:
         stub = kv_pb2_grpc.KVStub(channel)
 
         table = "foo"
