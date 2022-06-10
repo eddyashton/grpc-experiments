@@ -124,7 +124,7 @@ def serve(categories):
         True,
     )
     kv_server_address = "localhost:50052"
-    LOG.info(f"Listening for KV traffic on {registration_server_address}")
+    LOG.info(f"Listening for KV traffic on {kv_server_address}")
     kv_server.add_secure_port(kv_server_address, dynamic_creds)
 
     # Listen on both servers
