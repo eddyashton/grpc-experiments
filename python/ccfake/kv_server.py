@@ -96,23 +96,23 @@ def serve(categories):
     for cat in categories:
         LOG.info(f"  {cat}")
 
-    # Listen for Registration protocol
-    registration_server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
-    registry = Registry(categories=categories)
-    registry_pb2_grpc.add_RegistryServicer_to_server(registry, registration_server)
-    registration_server_address = "localhost:50051"
-    LOG.info(f"Listening for registrations on {registration_server_address}")
-    # TODO: This should be mutually auth'd
-    registration_server.add_insecure_port(registration_server_address)
-
     # Generate a fresh key-pair. Write public cert to disk
     key_priv_pem, _ = crypto.generate_rsa_keypair(2048)
-    cert_pem = crypto.generate_cert(key_priv_pem, cn="CN=localhost", ca=True)
+    cert_pem = crypto.generate_cert(key_priv_pem, cn="localhost", ca=True)
     server_cert_path = "server_cert.pem"
     with open(server_cert_path, "wb") as f:
         f.write(cert_pem)
         LOG.info(f"Wrote server's cert to {server_cert_path}")
     server_ident = ((key_priv_pem, cert_pem),)
+
+    # Listen for Registration protocol
+    registration_server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
+    registry = Registry(categories=categories)
+    registry_pb2_grpc.add_RegistryServicer_to_server(registry, registration_server)
+    registration_server_address = "localhost:50051"
+    static_credentials = grpc.ssl_server_credentials(server_ident)
+    LOG.info(f"Listening for registrations on {registration_server_address}")
+    registration_server.add_secure_port(registration_server_address, static_credentials)
 
     # Listen for KV protocol
     kv_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

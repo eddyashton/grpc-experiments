@@ -10,7 +10,10 @@ import crypto
 
 
 def register(args, executor_ident):
-    with grpc.insecure_channel("localhost:50051") as channel:
+    with open(args.server_cert, 'rb') as f:
+        creds = grpc.ssl_channel_credentials(f.read())
+    
+    with grpc.secure_channel("localhost:50051", creds) as channel:
         stub = registry_pb2_grpc.RegistryStub(channel)
 
         print("----")
@@ -27,7 +30,7 @@ def register(args, executor_ident):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--server_cert",
+        "--server-cert",
         type=str,
         help="Path to cert/roots to verify registration server",
         default="server_cert.pem"
@@ -54,7 +57,7 @@ if __name__ == "__main__":
 
     # Generate a fresh key-pair and cert, write to disk
     key_priv_pem, _ = crypto.generate_rsa_keypair(2048)
-    cert_pem = crypto.generate_cert(key_priv_pem, cn="CN=executor")
+    cert_pem = crypto.generate_cert(key_priv_pem, cn="executor")
     with open(args.executor_cert, "wb") as f:
         f.write(cert_pem)
         LOG.info(f"Wrote executor's certificate to {args.executor_cert}")

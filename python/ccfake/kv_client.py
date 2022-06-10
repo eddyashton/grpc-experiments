@@ -6,9 +6,9 @@ import kv_pb2_grpc
 
 
 def run():
-    with open("./cert.pem", "rb") as f:
+    with open("./executor_cert.pem", "rb") as f:
         cert = f.read()
-    with open("./key.pem", "rb") as f:
+    with open("./executor_privk.pem", "rb") as f:
         key = f.read()
     creds = grpc.ssl_channel_credentials(cert, key, cert)
 
