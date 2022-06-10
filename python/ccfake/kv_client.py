@@ -10,7 +10,9 @@ def run():
         cert = f.read()
     with open("./executor_privk.pem", "rb") as f:
         key = f.read()
-    creds = grpc.ssl_channel_credentials(cert, key, cert)
+    with open("./server_cert.pem", 'rb') as f:
+        sc = f.read()
+    creds = grpc.ssl_channel_credentials(sc, key, cert)
 
     with grpc.secure_channel("localhost:50052", creds) as channel:
         stub = kv_pb2_grpc.KVStub(channel)

@@ -123,7 +123,7 @@ def serve(categories):
         fetch_server_cert_config(server_ident, registry),
         True,
     )
-    kv_server_address = "localhost:50051"
+    kv_server_address = "localhost:50052"
     LOG.info(f"Listening for KV traffic on {registration_server_address}")
     kv_server.add_secure_port(kv_server_address, dynamic_creds)
 
