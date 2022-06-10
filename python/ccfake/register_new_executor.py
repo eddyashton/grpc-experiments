@@ -1,5 +1,6 @@
 from loguru import logger as LOG
 import argparse
+import hashlib
 
 import grpc
 
@@ -10,9 +11,9 @@ import crypto
 
 
 def register(args, cert):
-    with open(args.ca, 'rb') as f:
+    with open(args.ca, "rb") as f:
         creds = grpc.ssl_channel_credentials(f.read())
-    
+
     with grpc.secure_channel("localhost:50051", creds) as channel:
         stub = registry_pb2_grpc.RegistryStub(channel)
 
@@ -33,13 +34,13 @@ if __name__ == "__main__":
         "--ca",
         type=str,
         help="Path to cert/roots to verify registration server",
-        default="server_cert.pem"
+        default="server_cert.pem",
     )
     parser.add_argument(
         "--category",
         type=str,
         help="Category to register new executor under",
-        default="foo"
+        default="foo",
     )
     parser.add_argument(
         "--cert",
@@ -56,8 +57,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Generate a fresh key-pair and cert, write to disk
-    key_priv_pem, _ = crypto.generate_rsa_keypair(2048)
-    cert_pem = crypto.generate_cert(key_priv_pem, cn="executor")
+    key_priv_pem, key_pub_pem = crypto.generate_rsa_keypair(2048)
+    # NB: Give each a unique CN
+    cert_pem = crypto.generate_cert(
+        key_priv_pem, cn=f"executor {hashlib.md5(key_pub_pem).hexdigest()}"
+    )
     with open(args.cert, "wb") as f:
         f.write(cert_pem)
         LOG.info(f"Wrote executor's certificate to {args.cert}")

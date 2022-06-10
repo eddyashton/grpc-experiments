@@ -32,6 +32,7 @@ class Executor:
 class Registry(registry_pb2_grpc.RegistryServicer):
     def __init__(self, categories):
         self.executors = {category: {} for category in categories}
+        self._encoded_client_certs = b""
 
     def Register(self, request, context):
         ret = registry_pb2.RegisterResponse()
@@ -47,8 +48,12 @@ class Registry(registry_pb2_grpc.RegistryServicer):
         else:
             executors_for_category[request.executor_ident] = Executor()
             ret.accepted = True
+            self._encoded_client_certs += b"\n" + request.executor_ident
+            LOG.trace(f"New executor registered for {request.dispatch_category}")
+            LOG.trace(f"Acceptable client certs are now:\n{self._encoded_client_certs}")
 
         return ret
+
 
 class Tx:
     def __init__(self, kv):
@@ -100,13 +105,14 @@ def encode_accepted_client_certs(registry):
         for cat, executors in registry.executors.items()
         for ident, _ in executors.items()
     )
+    LOG.warning(f"Returning accepted client certs:\n{certs}")
     return certs
 
 
 def fetch_server_cert_config(server_ident, registry):
     def fn():
         server_credentials = grpc.ssl_server_certificate_configuration(
-            server_ident, encode_accepted_client_certs(registry)
+            server_ident, registry._encoded_client_certs
         )
         return server_credentials
 
@@ -143,7 +149,7 @@ def serve(categories):
     dynamic_creds = grpc.dynamic_ssl_server_credentials(
         grpc.ssl_server_certificate_configuration(server_ident),
         fetch_server_cert_config(server_ident, registry),
-        True,
+        require_client_authentication=True,
     )
     kv_server_address = "localhost:50052"
     LOG.info(f"Listening for KV traffic on {kv_server_address}")
