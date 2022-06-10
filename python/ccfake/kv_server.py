@@ -28,22 +28,22 @@ class Executor:
 class Registry(registry_pb2_grpc.RegistryServicer):
     def __init__(self, server, categories=DEFAULT_DISPATCH_CATEGORIES):
         self.server = server
-        self.allowed_categories = categories
-        self.executors = {}
+        self.executors = {category: {} for category in categories}
 
     def Register(self, request, context):
         ret = registry_pb2.RegisterResponse()
-        if request.dispatch_category not in self.allowed_categories:
+        if request.dispatch_category not in self.executors:
             ret.accepted = False
-            allowed_s = "\n".join(self.allowed_categories)
+            allowed_s = "\n".join(self.executors.keys())
             ret.error = f"'{request.dispatch_category}' is not a known dispatch category.\nAllowed categories are:\n{allowed_s}"
-        elif request.executor_ident in self.executors:
+
+        executors_for_category = self.executors[request.dispatch_category]
+        if request.executor_ident in executors_for_category:
             ret.accepted = False
             ret.error = f"Executor with this identity is already registered. Identity is:\n{request.executor_ident}"
         else:
-            self.executors[request.executor_ident] = Executor()
+            executors_for_category[request.executor_ident] = Executor()
             ret.accepted = True
-            # TODO: Modify server to allow connections from this ident?
 
         return ret
 
@@ -68,7 +68,12 @@ class KV(kv_pb2_grpc.KVServicer):
 
 
 def encode_accepted_client_certs(registry):
-    certs = b"\n".join(k for k in registry.executors.keys())
+    # TODO: Constructing this on every session is unnecessarily expensive
+    certs = b"\n".join(
+        ident
+        for cat, executors in registry.executors.items()
+        for ident, _ in executors.items()
+    )
     return certs
 
 
