@@ -7,11 +7,10 @@ from loguru import logger as LOG
 import argparse
 import grpc
 
-import registry_pb2
-import registry_pb2_grpc
-
-import kv_pb2
-import kv_pb2_grpc
+import generated.registry_pb2
+import generated.registry_pb2_grpc
+import generated.kv_pb2
+import generated.kv_pb2_grpc
 
 import crypto
 
