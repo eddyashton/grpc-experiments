@@ -6,7 +6,13 @@ import kv_pb2_grpc
 
 
 def run():
-    with grpc.insecure_channel("localhost:50052") as channel:
+    with open("./cert.pem", "rb") as f:
+        cert = f.read()
+    with open("./key.pem", "rb") as f:
+        key = f.read()
+    creds = grpc.ssl_channel_credentials(cert, key, cert)
+
+    with grpc.secure_channel("localhost:50052", creds) as channel:
         stub = kv_pb2_grpc.KVStub(channel)
 
         table = "foo"
