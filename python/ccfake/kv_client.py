@@ -13,6 +13,10 @@ def run(ca, privk, cert):
     with grpc.secure_channel("localhost:50052", creds) as channel:
         stub = kv_pb2_grpc.KVStub(channel)
 
+        LOG.info("----")
+        response = stub.Ready(kv_pb2.ReadyRequest())
+        LOG.info(response)
+
         table = "foo"
         key = b"\x42"
 
@@ -44,6 +48,10 @@ def run(ca, privk, cert):
         LOG.info(response.HasField("value"))
         LOG.info(response.value)
 
+        LOG.info("----")
+        response = stub.ApplyTx(kv_pb2.ApplyRequest())
+        LOG.info(response)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -51,7 +59,7 @@ if __name__ == "__main__":
         "--ca",
         type=str,
         help="Path to cert/roots to verify registration server",
-        default="server_cert.pem"
+        default="server_cert.pem",
     )
     parser.add_argument(
         "--cert",

@@ -6,6 +6,7 @@ from loguru import logger as LOG
 
 import argparse
 import grpc
+import hashlib
 
 import registry_pb2
 import registry_pb2_grpc
@@ -65,10 +66,18 @@ class Tx:
             t = self.writes[table]
             if key in t:
                 return t[key]
-        return self.kv[table][key]
+        if table in self.kv:
+            t = self.kv[table]
+            if key in t:
+                return t[key]
+        return None
 
     def put(self, table, key, value):
+        existed = (table in self.writes and key in self.writes[table]) or (
+            table in self.kv and key in self.kv[table]
+        )
         self.writes[table][key] = value
+        return existed
 
 
 class KV(kv_pb2_grpc.KVServicer):
@@ -77,25 +86,64 @@ class KV(kv_pb2_grpc.KVServicer):
         self.txs = {}
 
     def _get_caller(self, context):
-        k = context.auth_context()["x509_pem_cert"][0]
-        if k not in self.txs:
-            self.txs[k] = len(self.txs)
-        return self.txs[k]
+        # return context.auth_context()["x509_pem_cert"][0]
+        return hashlib.md5(context.auth_context()["x509_pem_cert"][0]).hexdigest()[:6]
+
+    def Ready(self, request, context):
+        caller = self._get_caller(context)
+        LOG.trace(f"Ready called by {caller}")
+
+        # TODO: Queue this executor until a request arrives
+        ret = kv_pb2.BeginTx()
+        ret.uri = "/foo/todo"
+        ret.body = b"\x00\x01"
+
+        assert caller not in self.txs, "Ready called multiple times"
+        tx = Tx(self.kv)
+        self.txs[caller] = tx
+
+        return ret
 
     def Get(self, request, context):
-        print(f"Get called by {self._get_caller(context)}")
+        caller = self._get_caller(context)
+        LOG.trace(f"Get called by {caller}")
+
+        assert caller in self.txs, "Get called out-of-order"
+        tx = self.txs[caller]
+
         ret = kv_pb2.GetResponse()
-        table = self.kv[request.table]
-        if request.key in table:
-            ret.value = table[request.key]
+        v = tx.get(request.table, request.key)
+        if v is not None:
+            ret.value = v
         return ret
 
     def Put(self, request, context):
-        print(f"Put called by {self._get_caller(context)}")
-        table = self.kv[request.table]
-        exists = request.key in table
-        table[request.key] = request.value
-        return kv_pb2.PutResponse(existed=exists)
+        caller = self._get_caller(context)
+        LOG.trace(f"Put called by {caller}")
+
+        assert caller in self.txs, "Put called out-of-order"
+        tx = self.txs[caller]
+
+        exists = tx.put(request.table, request.key, request.value)
+
+        ret = kv_pb2.PutResponse(existed=exists)
+        return ret
+
+    def ApplyTx(self, request, context):
+        caller = self._get_caller(context)
+        LOG.trace(f"ApplyTx called by {caller}")
+
+        assert caller in self.txs, "ApplyTx called out-of-order"
+        tx = self.txs[caller]
+        for table, entries in tx.writes.items():
+            t = self.kv[table]
+            for k, v in entries.items():
+                t[k] = v
+        
+        del self.txs[caller]
+
+        ret = kv_pb2.ApplyResponse()
+        return ret
 
 
 def encode_accepted_client_certs(registry):

@@ -26,8 +26,14 @@ sleep 5
 echo "$STEP_DELIMITER"
 echo "-- Register a new worker"
 python ./python/ccfake/register_new_executor.py
-sleep 1
 
 echo "$STEP_DELIMITER"
 echo "-- Test that the new executor has permissions"
+python ./python/ccfake/kv_client.py
+
+echo "$STEP_DELIMITER"
+echo "-- Sanity check that we can call multiple times"
+python ./python/ccfake/kv_client.py
+python ./python/ccfake/register_new_executor.py
+python ./python/ccfake/kv_client.py
 python ./python/ccfake/kv_client.py
