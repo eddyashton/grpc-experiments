@@ -1,18 +1,14 @@
-import grpc
+from loguru import logger as LOG
+import argparse
 
+import grpc
 
 import kv_pb2
 import kv_pb2_grpc
 
 
-def run():
-    with open("./executor_cert.pem", "rb") as f:
-        cert = f.read()
-    with open("./executor_privk.pem", "rb") as f:
-        key = f.read()
-    with open("./server_cert.pem", 'rb') as f:
-        sc = f.read()
-    creds = grpc.ssl_channel_credentials(sc, key, cert)
+def run(ca, privk, cert):
+    creds = grpc.ssl_channel_credentials(ca, privk, cert)
 
     with grpc.secure_channel("localhost:50052", creds) as channel:
         stub = kv_pb2_grpc.KVStub(channel)
@@ -20,34 +16,62 @@ def run():
         table = "foo"
         key = b"\x42"
 
-        print("----")
+        LOG.info("----")
         response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
-        print(response)
-        print(response.HasField("value"))
-        print(response.value)
+        LOG.info(response)
+        LOG.info(response.HasField("value"))
+        LOG.info(response.value)
 
-        print("----")
+        LOG.info("----")
         response = stub.Put(kv_pb2.PutRequest(table=table, key=key, value=b"0x00"))
-        print(response)
-        print(response.existed)
+        LOG.info(response)
+        LOG.info(response.existed)
 
-        print("----")
+        LOG.info("----")
         response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
-        print(response)
-        print(response.HasField("value"))
-        print(response.value)
+        LOG.info(response)
+        LOG.info(response.HasField("value"))
+        LOG.info(response.value)
 
-        print("----")
+        LOG.info("----")
         response = stub.Put(kv_pb2.PutRequest(table=table, key=key, value=b"0x01"))
-        print(response)
-        print(response.existed)
+        LOG.info(response)
+        LOG.info(response.existed)
 
-        print("----")
+        LOG.info("----")
         response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
-        print(response)
-        print(response.HasField("value"))
-        print(response.value)
+        LOG.info(response)
+        LOG.info(response.HasField("value"))
+        LOG.info(response.value)
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ca",
+        type=str,
+        help="Path to cert/roots to verify registration server",
+        default="server_cert.pem"
+    )
+    parser.add_argument(
+        "--cert",
+        type=str,
+        help="Path to certificate used for client auth",
+        default="executor_cert.pem",
+    )
+    parser.add_argument(
+        "--key",
+        type=str,
+        help="Path to private key used for client auth",
+        default="executor_privk.pem",
+    )
+    args = parser.parse_args()
+
+    with open(args.ca, "rb") as f:
+        ca = f.read()
+    with open(args.cert, "rb") as f:
+        cert = f.read()
+    with open(args.key, "rb") as f:
+        privk = f.read()
+
+    run(ca, privk, cert)
