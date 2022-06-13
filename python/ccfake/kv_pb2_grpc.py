@@ -15,7 +15,7 @@ class KVStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.Ready = channel.unary_unary(
+        self.Ready = channel.unary_stream(
                 '/ccfake.KV/Ready',
                 request_serializer=kv__pb2.ReadyRequest.SerializeToString,
                 response_deserializer=kv__pb2.BeginTx.FromString,
@@ -70,7 +70,7 @@ class KVServicer(object):
 
 def add_KVServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Ready': grpc.unary_unary_rpc_method_handler(
+            'Ready': grpc.unary_stream_rpc_method_handler(
                     servicer.Ready,
                     request_deserializer=kv__pb2.ReadyRequest.FromString,
                     response_serializer=kv__pb2.BeginTx.SerializeToString,
@@ -112,7 +112,7 @@ class KV(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/ccfake.KV/Ready',
+        return grpc.experimental.unary_stream(request, target, '/ccfake.KV/Ready',
             kv__pb2.ReadyRequest.SerializeToString,
             kv__pb2.BeginTx.FromString,
             options, channel_credentials,

@@ -12,7 +12,7 @@ PRIVATE_LOGGING_TABLE = "log_entries"
 
 def handle_get_log(body, stub):
     params = json.loads(body)
-    key = params["id"]
+    key = json.dumps(params["id"]).encode()
     LOG.trace("Getting log message")
     get_response = stub.Get(
         kv_pb2.GetRequest(
@@ -26,13 +26,14 @@ def handle_get_log(body, stub):
         result_body = get_response.value
     else:
         result_code = 204
+        result_body = b''
 
     stub.ApplyTx(kv_pb2.ApplyRequest(code=result_code, body=result_body))
 
 
 def handle_post_log(body, stub):
     params = json.loads(body)
-    key = params["id"]
+    key = json.dumps(params["id"]).encode()
     value = params["msg"].encode()
     LOG.trace("Post log message")
     put_response = stub.Put(
@@ -56,7 +57,12 @@ def handle_begin_tx(begin_tx, stub):
     elif begin_tx.uri == "POST /app/log":
         handle_post_log(begin_tx.body, stub)
     else:
-        raise ValueError(f"Unhandled URI: {begin_tx.uri}")
+        print(ValueError(f"Unhandled URI: {begin_tx.uri}"))
+        stub.ApplyTx(
+            kv_pb2.ApplyRequest(
+                code=404, body=f"The URI {begin_tx.uri} is not handled".encode()
+            )
+        )
 
 
 def run(ca, privk, cert):
@@ -65,10 +71,10 @@ def run(ca, privk, cert):
     with grpc.secure_channel("localhost:50052", creds) as channel:
         stub = kv_pb2_grpc.KVStub(channel)
 
-        while True:
-            LOG.trace("Sending Ready")
-            response = stub.Ready(kv_pb2.ReadyRequest())
-            handle_begin_tx(response, stub)
+        response = stub.Ready(kv_pb2.ReadyRequest())
+        for begin_tx in response:
+            LOG.trace("Handling transaction")
+            handle_begin_tx(begin_tx, stub)
 
 
 if __name__ == "__main__":

@@ -3,11 +3,13 @@ from concurrent import futures
 from enum import Enum
 from threading import Thread
 from loguru import logger as LOG
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from http import HTTPStatus
+from functools import partial
 
 import argparse
 import grpc
-import hashlib
+import time
 
 import registry_pb2
 import registry_pb2_grpc
@@ -38,6 +40,7 @@ class Registry(registry_pb2_grpc.RegistryServicer):
         self.ready_executors = {category: [] for category in categories}
         self.all_executors = {}
         self._encoded_client_certs = b""
+        self.pending_requests = []
 
     def _mark_ready(self, executor_id):
         assert executor_id in self.all_executors, executor_id
@@ -45,7 +48,6 @@ class Registry(registry_pb2_grpc.RegistryServicer):
         ex = self.all_executors[executor_id]
         ex.state = ExecutorState.Ready
         self.ready_executors[ex.category].append(ex)
-
 
     def Register(self, request, context):
         ret = registry_pb2.RegisterResponse()
@@ -106,18 +108,25 @@ class KV(kv_pb2_grpc.KVServicer):
         caller = self._get_caller(context)
         LOG.trace(f"Ready called by {caller}")
 
-        self.registry._mark_ready(caller)
+        while True:
+            self.registry._mark_ready(caller)
 
-        # TODO: Queue this executor until a request arrives
-        ret = kv_pb2.BeginTx()
-        ret.uri = "/foo/todo"
-        ret.body = b"\x00\x01"
+            while len(self.registry.pending_requests) == 0:
+                time.sleep(0.1)
 
-        assert caller not in self.txs, "Ready called multiple times"
-        tx = Tx(self.kv)
-        self.txs[caller] = tx
+            assert caller not in self.txs, "Ready called multiple times"
+            tx = Tx(self.kv)
+            self.txs[caller] = tx
 
-        return ret
+            req = self.registry.pending_requests.pop(0)
+
+            ret = kv_pb2.BeginTx()
+            ret.uri = req[0]
+            ret.body = req[1]
+            tx.http_response = req[2]
+
+            yield ret
+            time.sleep(1)
 
     def Get(self, request, context):
         caller = self._get_caller(context)
@@ -157,6 +166,10 @@ class KV(kv_pb2_grpc.KVServicer):
 
         del self.txs[caller]
 
+        tx.http_response.status_code = request.code
+        tx.http_response.body = request.body
+        tx.http_response.set = True
+
         ret = kv_pb2.ApplyResponse()
         return ret
 
@@ -181,15 +194,42 @@ def fetch_server_cert_config(server_ident, registry):
 
     return fn
 
+class HttpResult:
+    def __init__(self):
+        self.set = False
 
 class MyHTTPRequestHandler(BaseHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, registry, *args, **kwargs):
+        self.registry = registry
         BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
 
+    def _store_pending_request(self):
+        dispatch_string = f"{self.command} {self.path}"
+        LOG.warning(f"Processing {dispatch_string} request")
+        content_len = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_len)
+        LOG.warning(f"Body: {body}")
+
+        result = HttpResult()
+        self.registry.pending_requests.append((dispatch_string, body, result))
+
+        while not result.set:
+            time.sleep(0.1)
+
+        self.send_response(result.status_code)
+        body = result.body
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
-        LOG.warning(f"Processing GET request")
-        LOG.warning(self)
-        LOG.warning(self.path)
+        self._store_pending_request()
+
+    def do_POST(self):
+        self._store_pending_request()
+
+    def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
+        LOG.trace(f"MyHTTPRequestHandler: {fmt % args}")
 
 
 def serve(categories):
@@ -235,7 +275,9 @@ def serve(categories):
     registration_thread.start()
 
     # Listen for client HTTP commands
-    httpd = HTTPServer(("127.0.0.1", 8000), MyHTTPRequestHandler)
+    httpd = ThreadingHTTPServer(
+        ("127.0.0.1", 8000), partial(MyHTTPRequestHandler, registry)
+    )
 
     LOG.info("Running...")
     try:
@@ -252,7 +294,7 @@ def serve(categories):
     registration_thread.join()
     kv_server.stop(None)
     kv_thread.join()
-    
+
     LOG.info("Done")
 
 
