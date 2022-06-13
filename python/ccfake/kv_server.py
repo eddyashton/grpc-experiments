@@ -3,6 +3,7 @@ from concurrent import futures
 from enum import Enum
 from threading import Thread
 from loguru import logger as LOG
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import argparse
 import grpc
@@ -26,28 +27,40 @@ class ExecutorState(Enum):
 
 
 class Executor:
-    def __init__(self):
+    def __init__(self, category):
         self.state = ExecutorState.Registered
+        self.category = category
 
 
 class Registry(registry_pb2_grpc.RegistryServicer):
     def __init__(self, categories):
-        self.executors = {category: {} for category in categories}
+        self.allowed_categories = categories
+        self.ready_executors = {category: [] for category in categories}
+        self.all_executors = {}
         self._encoded_client_certs = b""
+
+    def _mark_ready(self, executor_id):
+        assert executor_id in self.all_executors, executor_id
+
+        ex = self.all_executors[executor_id]
+        ex.state = ExecutorState.Ready
+        self.ready_executors[ex.category].append(ex)
+
 
     def Register(self, request, context):
         ret = registry_pb2.RegisterResponse()
-        if request.dispatch_category not in self.executors:
+        if request.dispatch_category not in self.allowed_categories:
             ret.accepted = False
-            allowed_s = "\n".join(self.executors.keys())
+            allowed_s = "\n".join(self.allowed_categories.keys())
             ret.error = f"'{request.dispatch_category}' is not a known dispatch category.\nAllowed categories are:\n{allowed_s}"
 
-        executors_for_category = self.executors[request.dispatch_category]
-        if request.executor_ident in executors_for_category:
+        if request.executor_ident in self.all_executors:
             ret.accepted = False
             ret.error = f"Executor with this identity is already registered. Identity is:\n{request.executor_ident}"
         else:
-            executors_for_category[request.executor_ident] = Executor()
+            self.all_executors[request.executor_ident] = Executor(
+                request.dispatch_category
+            )
             ret.accepted = True
             self._encoded_client_certs += b"\n" + request.executor_ident
             LOG.trace(f"New executor registered for {request.dispatch_category}")
@@ -81,17 +94,19 @@ class Tx:
 
 
 class KV(kv_pb2_grpc.KVServicer):
-    def __init__(self):
+    def __init__(self, registry):
         self.kv = defaultdict(dict)
         self.txs = {}
+        self.registry = registry
 
     def _get_caller(self, context):
-        # return context.auth_context()["x509_pem_cert"][0]
-        return hashlib.md5(context.auth_context()["x509_pem_cert"][0]).hexdigest()[:6]
+        return context.auth_context()["x509_pem_cert"][0]
 
     def Ready(self, request, context):
         caller = self._get_caller(context)
         LOG.trace(f"Ready called by {caller}")
+
+        self.registry._mark_ready(caller)
 
         # TODO: Queue this executor until a request arrives
         ret = kv_pb2.BeginTx()
@@ -139,7 +154,7 @@ class KV(kv_pb2_grpc.KVServicer):
             t = self.kv[table]
             for k, v in entries.items():
                 t[k] = v
-        
+
         del self.txs[caller]
 
         ret = kv_pb2.ApplyResponse()
@@ -167,6 +182,16 @@ def fetch_server_cert_config(server_ident, registry):
     return fn
 
 
+class MyHTTPRequestHandler(BaseHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
+
+    def do_GET(self):
+        LOG.warning(f"Processing GET request")
+        LOG.warning(self)
+        LOG.warning(self.path)
+
+
 def serve(categories):
     LOG.info("Registering workers in the following categories:")
     for cat in categories:
@@ -192,7 +217,7 @@ def serve(categories):
 
     # Listen for KV protocol
     kv_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    kv = KV()
+    kv = KV(registry)
     kv_pb2_grpc.add_KVServicer_to_server(kv, kv_server)
     dynamic_creds = grpc.dynamic_ssl_server_credentials(
         grpc.ssl_server_certificate_configuration(server_ident),
@@ -203,16 +228,32 @@ def serve(categories):
     LOG.info(f"Listening for KV traffic on {kv_server_address}")
     kv_server.add_secure_port(kv_server_address, dynamic_creds)
 
-    # Listen on both servers
+    # Listen on both gRPC servers
     kv_thread = Thread(target=lambda: kv_server.start())
     kv_thread.start()
-    registration_server.start()
+    registration_thread = Thread(target=lambda: registration_server.start())
+    registration_thread.start()
+
+    # Listen for client HTTP commands
+    httpd = HTTPServer(("127.0.0.1", 8000), MyHTTPRequestHandler)
 
     LOG.info("Running...")
+    try:
+        httpd.serve_forever()
+    except:
+        pass
+
+    # Shutdown HTTP server
+    httpd.shutdown()
+    httpd.server_close()
 
     # Terminate
-    registration_server.wait_for_termination()
-    kv_server.stop()
+    registration_server.stop(None)
+    registration_thread.join()
+    kv_server.stop(None)
+    kv_thread.join()
+    
+    LOG.info("Done")
 
 
 if __name__ == "__main__":

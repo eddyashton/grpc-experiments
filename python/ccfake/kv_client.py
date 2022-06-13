@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ca",
         type=str,
-        help="Path to cert/roots to verify registration server",
+        help="Path to cert/roots to verify KV server",
         default="server_cert.pem",
     )
     parser.add_argument(
