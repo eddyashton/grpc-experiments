@@ -105,11 +105,14 @@ class KV(kv_pb2_grpc.KVServicer):
     def _get_caller(self, context):
         return context.auth_context()["x509_pem_cert"][0]
 
+    def _short_name(self, context):
+        caller = self._get_caller(context)
+        return hashlib.md5(caller).hexdigest()[:6]
+
     def Ready(self, request, context):
         caller = self._get_caller(context)
-        LOG.trace(f"Ready called by {caller}")
-
-        short_name = hashlib.md5(caller).hexdigest()[:6]
+        short_name = self._short_name(context)
+        LOG.trace(f"Ready called by {short_name}")
 
         while True:
             self.registry._mark_ready(caller)
@@ -209,7 +212,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         self.registry = registry
         BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
 
-    def _store_pending_request(self):
+    def _process_request(self):
         dispatch_string = f"{self.command} {self.path}"
         LOG.warning(f"Processing {dispatch_string} request")
         content_len = int(self.headers.get("Content-Length", 0))
@@ -229,10 +232,10 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        self._store_pending_request()
+        self._process_request()
 
     def do_POST(self):
-        self._store_pending_request()
+        self._process_request()
 
     def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
         LOG.trace(f"MyHTTPRequestHandler: {fmt % args}")
