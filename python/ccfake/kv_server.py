@@ -194,9 +194,11 @@ def fetch_server_cert_config(server_ident, registry):
 
     return fn
 
+
 class HttpResult:
     def __init__(self):
         self.set = False
+
 
 class MyHTTPRequestHandler(BaseHTTPRequestHandler):
     def __init__(self, registry, *args, **kwargs):
@@ -232,7 +234,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         LOG.trace(f"MyHTTPRequestHandler: {fmt % args}")
 
 
-def serve(categories):
+def serve(ca_out, categories):
     LOG.info("Registering workers in the following categories:")
     for cat in categories:
         LOG.info(f"  {cat}")
@@ -240,7 +242,7 @@ def serve(categories):
     # Generate a fresh key-pair. Write public cert to disk
     key_priv_pem, _ = crypto.generate_rsa_keypair(2048)
     cert_pem = crypto.generate_cert(key_priv_pem, cn="localhost", ca=True)
-    server_cert_path = "server_cert.pem"
+    server_cert_path = ca_out
     with open(server_cert_path, "wb") as f:
         f.write(cert_pem)
         LOG.info(f"Wrote server's cert to {server_cert_path}")
@@ -275,9 +277,12 @@ def serve(categories):
     registration_thread.start()
 
     # Listen for client HTTP commands
+    http_address = "127.0.0.1"
+    http_port = 8000
     httpd = ThreadingHTTPServer(
-        ("127.0.0.1", 8000), partial(MyHTTPRequestHandler, registry)
+        (http_address, http_port), partial(MyHTTPRequestHandler, registry)
     )
+    LOG.info(f"Listening for client requests on {http_address}:{http_port}")
 
     LOG.info("Running...")
     try:
@@ -301,6 +306,12 @@ def serve(categories):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--categories", nargs="*", type=str)
+    parser.add_argument(
+        "--ca-out",
+        type=str,
+        help="Path where server's CA should be written",
+        default="server_cert.pem",
+    )
     args = parser.parse_args()
 
     if args.categories:
@@ -308,4 +319,4 @@ if __name__ == "__main__":
     else:
         categories = DEFAULT_DISPATCH_CATEGORIES
 
-    serve(categories)
+    serve(args.ca_out, categories)
