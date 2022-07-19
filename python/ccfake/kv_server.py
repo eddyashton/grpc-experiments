@@ -50,6 +50,9 @@ class Registry(registry_pb2_grpc.RegistryServicer):
         ex.state = ExecutorState.Ready
         self.ready_executors[ex.category].append(ex)
 
+    def dispatch(self, dispatch_string, body, http_result):
+        self.pending_requests.append((dispatch_string, body, http_result))
+
     def Register(self, request, context):
         ret = registry_pb2.RegisterResponse()
         if request.dispatch_category not in self.allowed_categories:
@@ -220,7 +223,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         LOG.warning(f"Body: {body}")
 
         result = HttpResult()
-        self.registry.pending_requests.append((dispatch_string, body, result))
+        self.registry.dispatch(dispatch_string, body, result)
 
         while not result.set:
             time.sleep(0.1)
