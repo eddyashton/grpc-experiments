@@ -57,10 +57,10 @@ def handle_begin_tx(begin_tx, stub):
     elif begin_tx.uri == "POST /app/log":
         handle_post_log(begin_tx.body, stub)
     else:
-        print(ValueError(f"Unhandled URI: {begin_tx.uri}"))
+        LOG.error(ValueError(f"Unhandled URI: {begin_tx.uri}"))
         stub.ApplyTx(
             kv_pb2.ApplyRequest(
-                code=404, body=f"The URI {begin_tx.uri} is not handled".encode()
+                code=404, body=f"The URI {begin_tx.uri} is not handled\n".encode()
             )
         )
 

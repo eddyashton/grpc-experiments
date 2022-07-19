@@ -10,6 +10,7 @@ from functools import partial
 import argparse
 import grpc
 import time
+import hashlib
 
 import registry_pb2
 import registry_pb2_grpc
@@ -108,6 +109,8 @@ class KV(kv_pb2_grpc.KVServicer):
         caller = self._get_caller(context)
         LOG.trace(f"Ready called by {caller}")
 
+        short_name = hashlib.md5(caller).hexdigest()[:6]
+
         while True:
             self.registry._mark_ready(caller)
 
@@ -120,13 +123,14 @@ class KV(kv_pb2_grpc.KVServicer):
 
             req = self.registry.pending_requests.pop(0)
 
+            LOG.info(f"Dispatching a new request to {short_name}")
+
             ret = kv_pb2.BeginTx()
             ret.uri = req[0]
             ret.body = req[1]
             tx.http_response = req[2]
 
             yield ret
-            time.sleep(1)
 
     def Get(self, request, context):
         caller = self._get_caller(context)
