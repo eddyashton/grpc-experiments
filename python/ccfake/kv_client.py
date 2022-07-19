@@ -14,43 +14,45 @@ def run(ca, privk, cert):
         stub = kv_pb2_grpc.KVStub(channel)
 
         LOG.info("----")
-        response = stub.Ready(kv_pb2.ReadyRequest())
-        LOG.info(response)
+        ready_response = stub.Ready(kv_pb2.ReadyRequest())
 
-        table = "foo"
-        key = b"\x42"
+        for request in ready_response:
+            LOG.info(request)
 
-        LOG.info("----")
-        response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
-        LOG.info(response)
-        LOG.info(response.HasField("value"))
-        LOG.info(response.value)
+            table = "foo"
+            key = b"\x42"
 
-        LOG.info("----")
-        response = stub.Put(kv_pb2.PutRequest(table=table, key=key, value=b"0x00"))
-        LOG.info(response)
-        LOG.info(response.existed)
+            LOG.info("----")
+            response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
+            LOG.info(response)
+            LOG.info(response.HasField("value"))
+            LOG.info(response.value)
 
-        LOG.info("----")
-        response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
-        LOG.info(response)
-        LOG.info(response.HasField("value"))
-        LOG.info(response.value)
+            LOG.info("----")
+            response = stub.Put(kv_pb2.PutRequest(table=table, key=key, value=b"0x00"))
+            LOG.info(response)
+            LOG.info(response.existed)
 
-        LOG.info("----")
-        response = stub.Put(kv_pb2.PutRequest(table=table, key=key, value=b"0x01"))
-        LOG.info(response)
-        LOG.info(response.existed)
+            LOG.info("----")
+            response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
+            LOG.info(response)
+            LOG.info(response.HasField("value"))
+            LOG.info(response.value)
 
-        LOG.info("----")
-        response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
-        LOG.info(response)
-        LOG.info(response.HasField("value"))
-        LOG.info(response.value)
+            LOG.info("----")
+            response = stub.Put(kv_pb2.PutRequest(table=table, key=key, value=b"0x01"))
+            LOG.info(response)
+            LOG.info(response.existed)
 
-        LOG.info("----")
-        response = stub.ApplyTx(kv_pb2.ApplyRequest())
-        LOG.info(response)
+            LOG.info("----")
+            response = stub.Get(kv_pb2.GetRequest(table=table, key=key))
+            LOG.info(response)
+            LOG.info(response.HasField("value"))
+            LOG.info(response.value)
+
+            LOG.info("----")
+            response = stub.ApplyTx(kv_pb2.ApplyRequest())
+            LOG.info(response)
 
 
 if __name__ == "__main__":
