@@ -6,7 +6,7 @@ sequenceDiagram
 
     %% 404 if there are no executors registered for this
     %% What if none are free? Probably queue requests, up to a point?
-    CCF->>CCF: BL = find_executor("POST /calc")
+    CCF->>CCF: BL = find_executor(tx, "POST /calc")
 
     CCF->>BL: execute(method=POST, path=/calc?sum="foo=bar+2", ...)
     deactivate CCF
