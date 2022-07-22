@@ -1,0 +1,35 @@
+sequenceDiagram
+    rect rgb(220, 220, 220)
+    note over BL: Initialisation
+    BL->>BL: pk, cert = gen_identity()
+    BL->>BL: code_id = get_attestation() = "0xabcd"
+    end
+
+
+    rect rgb(220, 220, 220)
+    note over BL, CCF: Failed registration attempt
+    BL->>+CCF: register(cert="BL_A", code_id="0xabcd")
+    CCF->>CCF: kv[trusted_bl_code_ids].contains("0xabcd")?
+    CCF-->>-BL: rejected
+    end
+
+
+    note over BL: Should probably shutdown here, and be restarted <br/> on-demand, rather than spamming with retries
+
+
+    %% Open design question - should supported URLs be included here or at registration?
+    %% Do they need to be dictated by attestation, or can they be dynamic?
+    rect rgb(220, 220, 220)
+    note over Members, CCF: Adding a new trusted code ID
+    Members->>CCF: add_trusted_bl_code_id("0xabcd")
+    CCF->>CCF: kv[trusted_bl_code_ids] += "0xabcd"
+    end
+
+
+    rect rgb(220, 220, 220)
+    note over BL, CCF: Successful registration attempt
+    BL->>+CCF: register(cert="BL_A", code_id="0xabcd")
+    CCF->>CCF: kv[trusted_bl_code_ids].contains("0xabcd")?
+    CCF->>CCF: kv[bl_executors]["0xabcd"] += "BL_A"
+    CCF-->>-BL: accepted
+    end

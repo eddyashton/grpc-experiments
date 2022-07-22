@@ -1,0 +1,33 @@
+sequenceDiagram
+    User->>CCF: POST /calc?sum="foo=bar+2"
+
+    activate CCF
+    CCF->>CCF: tx = store.create_tx()
+
+    %% 404 if there are no executors registered for this
+    %% What if none are free? Probably queue requests, up to a point?
+    CCF->>CCF: BL = find_executor("POST /calc")
+
+    CCF->>BL: execute(method=POST, path=/calc?sum="foo=bar+2", ...)
+    deactivate CCF
+    activate BL
+
+    %% A minor detail, but probably some kind of dispatch in every BL container?
+    BL->>BL: find_function(...).call(...)
+
+    BL->>+CCF: KV.Get("bar")
+    CCF->>CCF: tx.get("bar")
+    CCF-->>-BL: "bar" = 5
+
+    BL->>+CCF: KV.Put("foo", 7)
+    CCF->>CCF: tx.put("foo", 7)
+    CCF-->>-BL: ok
+
+    BL-->>CCF: done(response_code=200, response_body={"foo": 7})
+    deactivate BL
+    activate CCF
+
+    CCF->>CCF: tx.commit()
+
+    CCF-->>User: 200 OK<br/>{"foo": 7}
+    deactivate CCF
